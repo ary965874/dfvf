@@ -1,6 +1,10 @@
 const { TelegramClient } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 
+// Hardcoded API credentials
+const API_ID = 23171051;
+const API_HASH = '10331d5d712364f57ffdd23417f4513c';
+
 module.exports = async (req, res) => {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -18,17 +22,17 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const { api_id, api_hash, phone } = req.body;
+    const { phone } = req.body;
 
-    if (!api_id || !api_hash || !phone) {
+    if (!phone) {
       return res.status(400).json({ 
         success: false, 
-        error: 'API ID, API Hash, and Phone number are required' 
+        error: 'Phone number is required' 
       });
     }
 
     const stringSession = new StringSession('');
-    const client = new TelegramClient(stringSession, parseInt(api_id), api_hash, {
+    const client = new TelegramClient(stringSession, API_ID, API_HASH, {
       connectionRetries: 5,
     });
 
@@ -36,14 +40,13 @@ module.exports = async (req, res) => {
 
     // Send code to phone number
     const result = await client.sendCode({
-      apiId: parseInt(api_id),
-      apiHash: api_hash,
+      apiId: API_ID,
+      apiHash: API_HASH,
     }, phone);
 
     // Store the phone code hash for verification
     const phoneCodeHash = result.phoneCodeHash;
 
-    // Return the hash and close connection (we'll create new client for verification)
     await client.disconnect();
 
     res.status(200).json({
@@ -61,7 +64,7 @@ module.exports = async (req, res) => {
     } else if (error.message.includes('PHONE_NUMBER_UNOCCUPIED')) {
       errorMessage = 'Phone number not registered on Telegram';
     } else if (error.message.includes('API_ID_INVALID')) {
-      errorMessage = 'Invalid API ID or Hash';
+      errorMessage = 'Invalid API credentials';
     } else if (error.message.includes('FLOOD')) {
       errorMessage = 'Too many attempts. Please try again later.';
     }
