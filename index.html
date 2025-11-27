@@ -315,9 +315,9 @@
                     <input type="text" id="otp_code" class="otp-input" placeholder="Enter 5-digit code" required maxlength="5" pattern="[0-9]{5}">
                 </div>
 
-                <div class="form-group">
-                    <label for="password">Password (if 2FA enabled):</label>
-                    <input type="password" id="password" placeholder="Enter your password (optional)">
+                <div class="form-group" id="passwordField" style="display: none;">
+                    <label for="password">Password (2FA required):</label>
+                    <input type="password" id="password" placeholder="Enter your 2FA password">
                 </div>
 
                 <button type="submit" class="btn" id="verifyOtpBtn">
@@ -382,10 +382,13 @@
             document.getElementById('loading').style.display = 'none';
         }
 
+        function showPasswordField() {
+            document.getElementById('passwordField').style.display = 'block';
+        }
+
         // Auto-submit OTP when 5 digits are entered
         document.getElementById('otp_code').addEventListener('input', function(e) {
             if (this.value.length === 5) {
-                // Auto-submit after a short delay
                 setTimeout(() => {
                     document.getElementById('verifyOtpBtn').click();
                 }, 500);
@@ -431,7 +434,6 @@
                         phone_code_hash: data.phone_code_hash
                     };
                     showStep(2);
-                    // Focus on OTP input
                     setTimeout(() => document.getElementById('otp_code').focus(), 100);
                 } else {
                     alert('Error: ' + data.error);
@@ -483,16 +485,15 @@
                     document.getElementById('sessionString').value = data.session_string;
                     showStep(3);
                 } else {
-                    document.getElementById('result').className = 'result error';
-                    document.getElementById('resultTitle').textContent = '❌ Error';
-                    document.getElementById('sessionString').value = data.error;
-                    showStep(3);
+                    if (data.error.includes('2FA') || data.error.includes('password')) {
+                        showPasswordField();
+                        alert('2FA password required. Please enter your password.');
+                    } else {
+                        alert('Error: ' + data.error);
+                    }
                 }
             } catch (error) {
-                document.getElementById('result').className = 'result error';
-                document.getElementById('resultTitle').textContent = '❌ Network Error';
-                document.getElementById('sessionString').value = 'Failed to connect to server: ' + error.message;
-                showStep(3);
+                alert('Network error: ' + error.message);
             } finally {
                 hideLoading();
             }
@@ -506,6 +507,7 @@
         document.getElementById('newSessionBtn').addEventListener('click', function() {
             document.getElementById('phoneForm').reset();
             document.getElementById('otpForm').reset();
+            document.getElementById('passwordField').style.display = 'none';
             document.getElementById('result').className = 'result';
             sessionData = null;
             showStep(1);
