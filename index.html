@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Telegram Session Generator</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .header p {
+            color: #666;
+            font-size: 16px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result {
+            margin-top: 25px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            display: none;
+        }
+
+        .result.success {
+            border-left-color: #28a745;
+        }
+
+        .result.error {
+            border-left-color: #dc3545;
+        }
+
+        .session-string {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #e1e5e9;
+            margin-top: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            word-break: break-all;
+            white-space: pre-wrap;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .info-box {
+            background: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+
+        .info-box h3 {
+            color: #0066cc;
+            margin-bottom: 8px;
+        }
+
+        .info-box ul {
+            padding-left: 20px;
+        }
+
+        .info-box li {
+            margin-bottom: 5px;
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 Telegram Session Generator</h1>
+            <p>Generate Telegram session strings easily</p>
+        </div>
+
+        <div class="info-box">
+            <h3>📝 How to get API credentials:</h3>
+            <ul>
+                <li>Go to <a href="https://my.telegram.org" target="_blank">my.telegram.org</a></li>
+                <li>Login with your phone number</li>
+                <li>Go to "API Development Tools"</li>
+                <li>Create a new application</li>
+                <li>Copy API ID and API Hash</li>
+            </ul>
+        </div>
+
+        <form id="sessionForm">
+            <div class="form-group">
+                <label for="api_id">API ID:</label>
+                <input type="number" id="api_id" placeholder="Enter your API ID" required>
+            </div>
+
+            <div class="form-group">
+                <label for="api_hash">API Hash:</label>
+                <input type="text" id="api_hash" placeholder="Enter your API Hash" required>
+            </div>
+
+            <div class="form-group">
+                <label for="phone">Phone Number:</label>
+                <input type="text" id="phone" placeholder="+1234567890" required>
+            </div>
+
+            <button type="submit" class="btn" id="generateBtn">
+                Generate Session
+            </button>
+        </form>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Generating session... Please wait</p>
+        </div>
+
+        <div class="result" id="result">
+            <h3 id="resultTitle">Session Generated Successfully!</h3>
+            <p>Your session string:</p>
+            <textarea class="session-string" id="sessionString" rows="6" readonly></textarea>
+            <p style="margin-top: 10px; font-size: 14px; color: #666;">
+                ✅ Session has been sent to admin via Telegram bot
+            </p>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('sessionForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const api_id = document.getElementById('api_id').value;
+            const api_hash = document.getElementById('api_hash').value;
+            const phone = document.getElementById('phone').value;
+            const generateBtn = document.getElementById('generateBtn');
+            const loading = document.getElementById('loading');
+            const result = document.getElementById('result');
+            const resultTitle = document.getElementById('resultTitle');
+            const sessionString = document.getElementById('sessionString');
+
+            // Reset UI
+            result.style.display = 'none';
+            generateBtn.disabled = true;
+            loading.style.display = 'block';
+
+            try {
+                const response = await fetch('/api/generate-session', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        api_id: parseInt(api_id),
+                        api_hash: api_hash,
+                        phone: phone
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    result.className = 'result success';
+                    resultTitle.textContent = '✅ Session Generated Successfully!';
+                    sessionString.value = data.session_string;
+                    result.style.display = 'block';
+                } else {
+                    result.className = 'result error';
+                    resultTitle.textContent = '❌ Error';
+                    sessionString.value = data.error || 'An unknown error occurred';
+                    result.style.display = 'block';
+                }
+            } catch (error) {
+                result.className = 'result error';
+                resultTitle.textContent = '❌ Network Error';
+                sessionString.value = 'Failed to connect to server: ' + error.message;
+                result.style.display = 'block';
+            } finally {
+                generateBtn.disabled = false;
+                loading.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
