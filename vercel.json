@@ -2,12 +2,12 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/request-code.js",
-      "use": "@vercel/node"
+      "src": "api/request-code.py",
+      "use": "@vercel/python"
     },
     {
-      "src": "api/verify-code.js",
-      "use": "@vercel/node"
+      "src": "api/verify-code.py",
+      "use": "@vercel/python"
     },
     {
       "src": "index.html",
@@ -21,13 +21,11 @@
     },
     {
       "src": "/api/request-code",
-      "dest": "/api/request-code.js",
-      "methods": ["POST", "OPTIONS"]
+      "dest": "/api/request-code.py"
     },
     {
       "src": "/api/verify-code",
-      "dest": "/api/verify-code.js",
-      "methods": ["POST", "OPTIONS"]
+      "dest": "/api/verify-code.py"
     }
   ]
 }
