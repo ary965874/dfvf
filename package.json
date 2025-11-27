@@ -1,15 +1,13 @@
 {
   "name": "telegram-session-generator",
   "version": "1.0.0",
-  "description": "Telegram Session String Generator with Bot Notification",
+  "description": "Telegram Session Generator with OTP Verification",
   "main": "index.js",
   "scripts": {
-    "dev": "vercel dev",
-    "start": "node server.js"
+    "dev": "vercel dev"
   },
   "dependencies": {
-    "telegram": "^2.16.5",
-    "node-fetch": "^2.6.7"
+    "telegram": "^2.16.5"
   },
   "engines": {
     "node": ">=18.x"
