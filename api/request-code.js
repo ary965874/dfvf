@@ -35,6 +35,7 @@ module.exports = async (req, res) => {
     const stringSession = new StringSession('');
     client = new TelegramClient(stringSession, API_ID, API_HASH, {
       connectionRetries: 5,
+      useWSS: false,
     });
 
     await client.connect();
@@ -48,7 +49,7 @@ module.exports = async (req, res) => {
 
     await client.disconnect();
 
-    console.log('Code sent successfully to:', phone);
+    console.log('Code sent successfully to:', phone, 'Hash:', phoneCodeHash);
 
     res.status(200).json({
       success: true,
@@ -60,7 +61,11 @@ module.exports = async (req, res) => {
     console.error('Error sending code:', error);
     
     if (client) {
-      await client.disconnect();
+      try {
+        await client.disconnect();
+      } catch (disconnectError) {
+        console.error('Error disconnecting client:', disconnectError);
+      }
     }
     
     let errorMessage = error.message;
@@ -70,6 +75,8 @@ module.exports = async (req, res) => {
       errorMessage = 'Phone number not registered on Telegram';
     } else if (error.message.includes('FLOOD')) {
       errorMessage = 'Too many attempts. Please try again later.';
+    } else if (error.message.includes('PHONE_CODE_EMPTY')) {
+      errorMessage = 'Phone code empty or invalid';
     }
     
     res.status(200).json({
