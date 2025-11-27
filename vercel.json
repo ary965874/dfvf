@@ -2,11 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/request-code.py",
-      "use": "@vercel/python"
-    },
-    {
-      "src": "api/verify-code.py",
+      "src": "api/generate-session.py",
       "use": "@vercel/python"
     },
     {
@@ -20,12 +16,8 @@
       "dest": "/index.html"
     },
     {
-      "src": "/api/request-code",
-      "dest": "/api/request-code.py"
-    },
-    {
-      "src": "/api/verify-code",
-      "dest": "/api/verify-code.py"
+      "src": "/api/generate-session",
+      "dest": "/api/generate-session.py"
     }
   ]
 }
