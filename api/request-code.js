@@ -30,6 +30,8 @@ module.exports = async (req, res) => {
       });
     }
 
+    console.log('Requesting code for:', phone);
+
     const stringSession = new StringSession('');
     client = new TelegramClient(stringSession, API_ID, API_HASH, {
       connectionRetries: 5,
@@ -45,6 +47,8 @@ module.exports = async (req, res) => {
     const phoneCodeHash = result.phoneCodeHash;
 
     await client.disconnect();
+
+    console.log('Code sent successfully to:', phone);
 
     res.status(200).json({
       success: true,
