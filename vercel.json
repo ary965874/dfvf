@@ -2,7 +2,11 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/generate-session.js",
+      "src": "api/request-code.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/verify-code.js",
       "use": "@vercel/node"
     },
     {
@@ -16,8 +20,13 @@
       "dest": "/index.html"
     },
     {
-      "src": "/api/generate-session",
-      "dest": "/api/generate-session.js",
+      "src": "/api/request-code",
+      "dest": "/api/request-code.js",
+      "methods": ["POST", "OPTIONS"]
+    },
+    {
+      "src": "/api/verify-code",
+      "dest": "/api/verify-code.js",
       "methods": ["POST", "OPTIONS"]
     }
   ]
